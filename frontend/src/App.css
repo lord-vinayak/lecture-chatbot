@@ -1,0 +1,54 @@
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: #fff;
+}
+
+.app-header {
+  background: #1976d2;
+  color: white;
+  padding: 15px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.app-header h1 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.connection-status {
+  font-size: 13px;
+}
+
+.status-ok {
+  color: #4caf50;
+  font-weight: 500;
+}
+
+.status-error {
+  color: #ffcdd2;
+  font-weight: 500;
+}
+
+.app-content {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+@media (max-width: 768px) {
+  .app-content {
+    flex-direction: column;
+  }
+
+  .video-player-container {
+    max-width: 100%;
+    border-right: none;
+    border-bottom: 1px solid #ddd;
+  }
+}

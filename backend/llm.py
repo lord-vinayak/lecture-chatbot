@@ -6,7 +6,7 @@ from typing import List
 load_dotenv()
 
 OLLAMA_API_URL = os.getenv("OLLAMA_API_URL", "http://localhost:11434")
-OLLAMA_MODEL = "llama2"  # Default; can be overridden to llama2:13b, etc.
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama2")
 
 def query_ollama(prompt: str, model: str = OLLAMA_MODEL) -> str:
     """

@@ -1,9 +1,6 @@
-version: '3.8'
-
 services:
-  # PostgreSQL database with pgvector
   postgres:
-    image: pgvector/pgvector:0.5.0-pg15
+    image: pgvector/pgvector:pg15
     container_name: videochat_postgres
     environment:
       POSTGRES_USER: postgres
@@ -20,7 +17,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # FastAPI backend
   backend:
     build:
       context: ./backend
@@ -28,12 +24,10 @@ services:
     container_name: videochat_backend
     ports:
       - "8000:8000"
+    env_file:
+      - ./backend/.env
     environment:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/videochat
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
-      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
-      WHISPER_MODEL: ${WHISPER_MODEL:-base}
-      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-all-MiniLM-L6-v2}
     depends_on:
       postgres:
         condition: service_healthy
@@ -42,7 +36,6 @@ services:
       - ./uploads:/app/uploads
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
-  # React frontend
   frontend:
     build:
       context: ./frontend

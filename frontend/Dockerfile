@@ -6,7 +6,7 @@ WORKDIR /app
 COPY package.json ./
 
 # Install dependencies
-RUN npm install --legacy-peer-deps
+RUN npm install --legacy-peer-deps && mkdir -p /app/node_modules/.cache && chmod -R 777 /app/node_modules/.cache
 
 # Copy app code
 COPY . .

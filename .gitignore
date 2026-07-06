@@ -1,3 +1,92 @@
+# ========================
+# Backend (Python/FastAPI)
+# ========================
 
+# Environment & secrets
 backend/.env
+backend/.env.*
+!backend/.env.example
+
+# Python bytecode
+backend/__pycache__/
+backend/**/__pycache__/
+backend/*.pyc
+backend/*.pyo
+backend/*.pyd
+
+# Virtual environments
+backend/venv/
+backend/.venv/
+backend/env/
+
+# Uploaded videos (can be large)
+uploads/
+
+# Pytest / coverage
+backend/.pytest_cache/
+backend/.coverage
+backend/htmlcov/
+
+# Distribution / packaging
+backend/*.egg-info/
+backend/dist/
+backend/build/
+
+# Whisper model cache (downloaded on first run, can be GBs)
+backend/models/
+
+# ========================
+# Frontend (React/Node)
+# ========================
+
+# Dependencies
+frontend/node_modules/
+
+# Production build output
+frontend/build/
+frontend/dist/
+
+# Environment
+frontend/.env
+frontend/.env.*
+!frontend/.env.example
+
+# React / CRA cache
+frontend/.cache/
+
+# TypeScript build info
+frontend/*.tsbuildinfo
+frontend/tsconfig.tsbuildinfo
+
+# ========================
+# Docker
+# ========================
+
+# Don't ignore docker-compose overrides accidentally created locally
+docker-compose.prod.yml
+docker-compose.local.yml
+docker-compose.override.yml
+
+# ========================
+# General
+# ========================
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+logs/
+
+# Internal docs/plans
 docs/superpowers/

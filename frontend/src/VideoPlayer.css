@@ -1,0 +1,97 @@
+.video-player-container {
+  padding: 20px;
+  border-right: 1px solid #ddd;
+  max-width: 400px;
+  overflow-y: auto;
+}
+
+.video-player-container h2 {
+  margin-top: 0;
+  font-size: 18px;
+  color: #333;
+}
+
+.video-info {
+  background: #f5f5f5;
+  padding: 15px;
+  border-radius: 4px;
+  margin-bottom: 20px;
+}
+
+.video-info p {
+  margin: 8px 0;
+  font-size: 14px;
+}
+
+.info-message {
+  color: #ff9800;
+  font-weight: 500;
+}
+
+.error-message {
+  color: #d32f2f;
+  font-weight: 500;
+}
+
+.upload-form {
+  display: flex;
+  flex-direction: column;
+}
+
+.form-group {
+  margin-bottom: 15px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: 500;
+  color: #333;
+  font-size: 14px;
+}
+
+.form-group input {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+.form-group input:disabled {
+  background: #f5f5f5;
+  cursor: not-allowed;
+}
+
+.file-info {
+  margin-top: 5px;
+  font-size: 12px;
+  color: #666;
+}
+
+button {
+  padding: 10px;
+  background: #1976d2;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+button:hover:not(:disabled) {
+  background: #1565c0;
+}
+
+button:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+.upload-status {
+  margin-top: 10px;
+  font-size: 13px;
+  color: #666;
+}

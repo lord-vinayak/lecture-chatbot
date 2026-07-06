@@ -7,12 +7,12 @@ backend/.env
 backend/.env.*
 !backend/.env.example
 
-# Python bytecode
-backend/__pycache__/
-backend/**/__pycache__/
-backend/*.pyc
-backend/*.pyo
-backend/*.pyd
+# Python bytecode (volume mount creates these on host)
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
 
 # Virtual environments
 backend/venv/

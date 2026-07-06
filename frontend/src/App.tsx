@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { VideoPlayer } from './VideoPlayer';
 import { ChatBox } from './ChatBox';
 import { Video, getVideo, healthCheck } from './api';
@@ -7,6 +7,7 @@ import './App.css';
 const App: React.FC = () => {
   const [currentVideo, setCurrentVideo] = useState<Video | null>(null);
   const [isConnected, setIsConnected] = useState(false);
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     // Check backend connection on mount
@@ -15,22 +16,31 @@ const App: React.FC = () => {
       .catch(() => setIsConnected(false));
   }, []);
 
+  useEffect(() => {
+    return () => {
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+    };
+  }, []);
+
   const handleVideoLoaded = async (video: Video) => {
     setCurrentVideo(video);
 
+    if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+
     // Poll for transcription status
-    const pollInterval = setInterval(async () => {
+    pollIntervalRef.current = setInterval(async () => {
       try {
         const updated = await getVideo(video.id);
         setCurrentVideo(updated);
 
         if (updated.transcription_status !== 'pending') {
-          clearInterval(pollInterval);
+          if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+          pollIntervalRef.current = null;
         }
       } catch (error) {
         console.error('Failed to check transcription status:', error);
       }
-    }, 3000); // Poll every 3 seconds
+    }, 3000);
   };
 
   return (

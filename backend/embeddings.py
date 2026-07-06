@@ -76,8 +76,9 @@ def find_similar_chunks(
     similarities = []
     for chunk_text, chunk_vec in chunk_embeddings:
         chunk_vec = np.array(chunk_vec)
-        # Cosine similarity
-        similarity = np.dot(q_vec, chunk_vec) / (np.linalg.norm(q_vec) * np.linalg.norm(chunk_vec))
+        # Guard against zero-norm vectors (e.g. empty/whitespace-only chunks)
+        denom = np.linalg.norm(q_vec) * np.linalg.norm(chunk_vec)
+        similarity = float(np.dot(q_vec, chunk_vec) / denom) if denom > 0 else 0.0
         similarities.append((chunk_text, similarity))
 
     # Sort by similarity descending and return top-k

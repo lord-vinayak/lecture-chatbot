@@ -21,7 +21,7 @@ app = FastAPI(title="Video Chat Q&A Platform")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -65,8 +65,9 @@ def transcribe_and_store(video_id: uuid.UUID, file_path: str):
     except Exception as e:
         with get_db_context() as db:
             video = db.query(Video).filter(Video.id == video_id).first()
-            video.transcription_status = "failed"
-            db.commit()
+            if video:
+                video.transcription_status = "failed"
+                db.commit()
         print(f"✗ Transcription failed for video {video_id}: {str(e)}")
 
 # --- Endpoints ---
@@ -94,9 +95,9 @@ async def upload_video(
     file_extension = Path(file.filename).suffix
     file_path = UPLOAD_DIR / f"{video_id}{file_extension}"
 
-    content = await file.read()
     with open(file_path, "wb") as f:
-        f.write(content)
+        while chunk := await file.read(1024 * 1024):
+            f.write(chunk)
 
     # Create video record
     video = Video(
@@ -155,20 +156,20 @@ async def ask_question(
             detail=f"Video not ready (status: {video.transcription_status})"
         )
 
-    # Get transcript chunks
-    chunks = db.query(TranscriptChunk).filter(
-        TranscriptChunk.video_id == vid_uuid
-    ).all()
-
-    if not chunks:
-        raise HTTPException(status_code=400, detail="No transcript chunks found")
-
-    # Find relevant chunks via vector search
-    from embeddings import embed_text, find_similar_chunks
+    from embeddings import embed_text
 
     question_embedding = embed_text(request.question)
-    chunk_embeddings = [(c.chunk_text, c.embedding) for c in chunks]
-    similar_chunks = find_similar_chunks(question_embedding, chunk_embeddings, top_k=3)
+    similar_rows = (
+        db.query(TranscriptChunk.chunk_text)
+        .filter(TranscriptChunk.video_id == vid_uuid)
+        .order_by(TranscriptChunk.embedding.cosine_distance(question_embedding))
+        .limit(3)
+        .all()
+    )
+    similar_chunks = [r.chunk_text for r in similar_rows]
+
+    if not similar_chunks:
+        raise HTTPException(status_code=400, detail="No transcript chunks found")
 
     # Generate answer
     answer_text = answer_question(request.question, similar_chunks)

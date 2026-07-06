@@ -1,4 +1,5 @@
 from faster_whisper import WhisperModel
+import ctranslate2
 import os
 from dotenv import load_dotenv
 
@@ -11,7 +12,9 @@ def get_whisper_model():
     """Lazy-load Whisper model (avoids reload on each call)"""
     global MODEL_CACHE
     if "model" not in MODEL_CACHE:
-        MODEL_CACHE["model"] = WhisperModel(WHISPER_MODEL, device="cuda", compute_type="float16")
+        device = "cuda" if ctranslate2.get_cuda_device_count() > 0 else "cpu"
+        compute_type = "float16" if device == "cuda" else "int8"
+        MODEL_CACHE["model"] = WhisperModel(WHISPER_MODEL, device=device, compute_type=compute_type)
     return MODEL_CACHE["model"]
 
 def transcribe_video(file_path: str) -> str:

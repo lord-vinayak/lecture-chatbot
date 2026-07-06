@@ -1,68 +1,43 @@
-import requests
+from openai import OpenAI
 import os
 from dotenv import load_dotenv
 from typing import List
 
 load_dotenv()
 
-OLLAMA_API_URL = os.getenv("OLLAMA_API_URL", "http://localhost:11434")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama2")
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 
-def query_ollama(prompt: str, model: str = OLLAMA_MODEL) -> str:
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+def answer_question(question: str, context_chunks: List[str]) -> str:
     """
-    Send prompt to Ollama and get response.
-    Timeout set to 30s for inference latency.
-    """
-    url = f"{OLLAMA_API_URL}/api/generate"
-
-    payload = {
-        "model": model,
-        "prompt": prompt,
-        "stream": False,
-        "temperature": 0.2  # Low temp for factual, deterministic answers
-    }
-
-    try:
-        response = requests.post(url, json=payload, timeout=30)
-        response.raise_for_status()
-
-        result = response.json()
-        return result.get("response", "").strip()
-    except requests.exceptions.Timeout:
-        return "I'm taking too long to think about this. Please try again."
-    except requests.exceptions.ConnectionError:
-        return "Unable to process your question right now (inference service unavailable)"
-    except Exception as e:
-        return f"Error processing question: {str(e)}"
-
-def answer_question(
-    question: str,
-    context_chunks: List[str],
-    model: str = OLLAMA_MODEL
-) -> str:
-    """
-    Answer question based on context chunks from transcript.
-
-    Prompt engineering ensures:
-    - Answer comes ONLY from provided context
-    - Refuses to answer if context doesn't contain answer
-    - No hallucination
+    Answer question based on context chunks from transcript using OpenAI.
+    Answers ONLY from provided context - refuses if answer isn't there.
     """
     if not context_chunks:
         context = "(No relevant content found in transcript)"
     else:
         context = "\n\n".join([f"- {chunk}" for chunk in context_chunks])
 
-    prompt = f"""You are a helpful tutor assistant for a course.
-A student asked a question about the course video.
-Answer ONLY based on the transcript content provided below.
-If the answer is not in the transcript, clearly say "I couldn't find that information in the video."
-
-Transcript content:
-{context}
-
-Student question: {question}
-
-Answer:"""
-
-    return query_ollama(prompt, model)
+    try:
+        response = client.chat.completions.create(
+            model=OPENAI_MODEL,
+            temperature=0.2,
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are a helpful tutor assistant for a course. "
+                        "Answer ONLY based on the transcript content provided. "
+                        'If the answer is not in the transcript, say "I couldn\'t find that information in the video."'
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": f"Transcript content:\n{context}\n\nStudent question: {question}",
+                },
+            ],
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        return f"Unable to process your question right now: {str(e)}"

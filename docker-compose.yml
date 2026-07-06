@@ -20,18 +20,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # Ollama LLM inference
-  ollama:
-    image: ollama/ollama:latest
-    container_name: videochat_ollama
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama_data:/root/.ollama
-    environment:
-      - OLLAMA_HOST=0.0.0.0:11434
-    # Note: Run `docker exec videochat_ollama ollama pull llama2` after starting
-
   # FastAPI backend
   backend:
     build:
@@ -42,9 +30,10 @@ services:
       - "8000:8000"
     environment:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/videochat
-      OLLAMA_API_URL: http://ollama:11434
-      WHISPER_MODEL: base
-      EMBEDDING_MODEL: all-MiniLM-L6-v2
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      WHISPER_MODEL: ${WHISPER_MODEL:-base}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-all-MiniLM-L6-v2}
     depends_on:
       postgres:
         condition: service_healthy
@@ -72,4 +61,3 @@ services:
 
 volumes:
   postgres_data:
-  ollama_data:

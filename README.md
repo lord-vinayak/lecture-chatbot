@@ -8,7 +8,7 @@ A self-hosted platform where students ask questions about course videos and get 
 - **Ask questions** and get answers sourced only from what was taught in the video
 - **Hallucination prevention** - model explicitly refuses if the answer isn't in the transcript
 - **Chat history** with source chunk transparency (see exactly which part of the transcript was used)
-- **Zero API costs** - fully open-source stack, GPU cost is capex not opex
+- **OpenAI-powered** answers via GPT-4o-mini (fast, cheap, accurate)
 - **Docker-first** - single `docker-compose up` to run everything locally
 
 ---
@@ -17,16 +17,15 @@ A self-hosted platform where students ask questions about course videos and get 
 
 - [Tech Stack](#tech-stack)
 - [Prerequisites](#prerequisites)
-- [Getting Started](#getting-started)
+- [Run Locally](#run-locally)
+- [Deploy to Hostinger VPS](#deploy-to-hostinger-vps)
 - [Architecture](#architecture)
 - [API Reference](#api-reference)
 - [Environment Variables](#environment-variables)
 - [Project Structure](#project-structure)
 - [Database Schema](#database-schema)
 - [Running Tests](#running-tests)
-- [Deployment](#deployment)
 - [Troubleshooting](#troubleshooting)
-- [Demo Success Criteria](#demo-success-criteria)
 - [Production Scaling Path](#production-scaling-path)
 
 ---
@@ -38,78 +37,456 @@ A self-hosted platform where students ask questions about course videos and get 
 | **Frontend** | React 18 + TypeScript + Axios |
 | **Backend** | Python 3.11 + FastAPI + Uvicorn |
 | **Transcription** | Faster-Whisper (4x faster than standard Whisper) |
-| **LLM Inference** | Ollama + Llama 2 (runs locally on GPU) |
-| **Embeddings** | Sentence-transformers `all-MiniLM-L6-v2` (384-dim) |
+| **LLM Inference** | OpenAI API (GPT-4o-mini by default) |
+| **Embeddings** | Sentence-transformers `all-MiniLM-L6-v2` (384-dim, runs locally) |
 | **Database** | PostgreSQL 15 + pgvector extension |
 | **ORM** | SQLAlchemy 2.0 |
 | **Validation** | Pydantic v2 |
-| **Orchestration** | Docker Compose (demo) |
+| **Orchestration** | Docker Compose |
 
 ---
 
 ## Prerequisites
 
+### For local development (Docker)
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) 24+
 - [Git](https://git-scm.com/)
-- A GPU is strongly recommended for transcription and LLM inference (NVIDIA with CUDA, or Apple Silicon via Metal). CPU works but is slow.
+- An [OpenAI API key](https://platform.openai.com/api-keys)
+- A GPU is recommended for Whisper transcription (NVIDIA with CUDA). CPU works but is slower.
 
-For local development without Docker:
+### For local development (without Docker)
 - Python 3.11+
 - Node.js 18+
-- PostgreSQL 15+ with the pgvector extension
-- [Ollama](https://ollama.ai/) installed and running
+- PostgreSQL 15+ with the pgvector extension installed
+- An OpenAI API key
 
 ---
 
-## Getting Started
+## Run Locally
 
-### 1. Clone the Repository
+### Step 1: Clone the repo
 
 ```bash
 git clone https://github.com/lord-vinayak/lecture-chatbot.git
 cd lecture-chatbot
 ```
 
-### 2. Configure Environment
+### Step 2: Set your OpenAI API key
 
 ```bash
 cp backend/.env.example backend/.env
 ```
 
-The defaults work out of the box with Docker. No changes needed for local dev.
+Open `backend/.env` and set your key:
 
-### 3. Start All Services
+```env
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/videochat
+OPENAI_API_KEY=sk-your-actual-key-here
+OPENAI_MODEL=gpt-4o-mini
+WHISPER_MODEL=base
+EMBEDDING_MODEL=all-MiniLM-L6-v2
+```
+
+### Step 3: Start all services
 
 ```bash
 docker-compose up --build
 ```
 
-This starts four containers:
-- `videochat_postgres` - PostgreSQL 15 with pgvector (port 5432)
-- `videochat_ollama` - Ollama LLM server (port 11434)
-- `videochat_backend` - FastAPI backend (port 8000)
-- `videochat_frontend` - React frontend (port 3000)
+This starts three containers:
 
-The database schema is applied automatically on first start via the init script in `backend/migrations/`.
+| Container | What it is | Port |
+|---|---|---|
+| `videochat_postgres` | PostgreSQL 15 + pgvector | 5432 |
+| `videochat_backend` | FastAPI backend | 8000 |
+| `videochat_frontend` | React frontend | 3000 |
 
-### 4. Pull the LLM Model
+The database schema (tables + pgvector indexes) is applied automatically on first start.
 
-In a separate terminal, pull the Llama 2 model into the Ollama container. This only needs to be done once (model is persisted in a Docker volume):
+First build takes 3-5 minutes while Docker downloads images and installs Python packages. Subsequent starts are instant.
+
+### Step 4: Verify it's working
 
 ```bash
-docker exec videochat_ollama ollama pull llama2
+curl http://localhost:8000/health
+# Expected: {"status":"ok"}
 ```
 
-This downloads ~3.8GB. Progress will show in the terminal.
+### Step 5: Open the app
 
-### 5. Open the App
+- **Frontend:** [http://localhost:3000](http://localhost:3000)
+- **API docs (Swagger UI):** [http://localhost:8000/docs](http://localhost:8000/docs)
 
-Visit [http://localhost:3000](http://localhost:3000)
+### Without Docker (manual setup)
 
-- **Left panel** - upload a video and watch transcription status
-- **Right panel** - ask questions once transcription completes
+**Backend:**
 
-The backend API docs (auto-generated by FastAPI) are available at [http://localhost:8000/docs](http://localhost:8000/docs).
+```bash
+cd backend
+python -m venv venv
+# Windows:
+venv\Scripts\activate
+# Mac/Linux:
+source venv/bin/activate
+
+pip install -r requirements.txt
+cp .env.example .env
+# Edit .env with your values
+
+uvicorn main:app --reload --port 8000
+```
+
+**Frontend:**
+
+```bash
+cd frontend
+npm install
+REACT_APP_API_URL=http://localhost:8000 npm start
+```
+
+**Database (manual):**
+
+Make sure PostgreSQL is running and the pgvector extension is installed:
+
+```sql
+-- Connect as superuser
+CREATE DATABASE videochat;
+\c videochat
+CREATE EXTENSION IF NOT EXISTS vector;
+```
+
+Then apply the schema:
+
+```bash
+psql -U postgres -d videochat -f backend/migrations/001_initial_schema.sql
+```
+
+---
+
+## Deploy to Hostinger VPS
+
+### What you need
+
+- A Hostinger KVM VPS plan (KVM 2 or higher recommended - 2 vCPU, 8GB RAM minimum)
+- Ubuntu 22.04 as the OS (select during VPS creation)
+- Your OpenAI API key
+- A domain name (optional but recommended - you can use the VPS IP directly)
+
+> **GPU note:** With OpenAI handling LLM inference, you no longer need a GPU for answering questions. A GPU is only useful for faster Whisper transcription. For most use cases, a CPU-only VPS works fine with `WHISPER_MODEL=base`.
+
+---
+
+### Phase 1: Initial Server Setup
+
+**1. SSH into your VPS**
+
+Hostinger gives you the root password via email or the hPanel dashboard.
+
+```bash
+ssh root@YOUR_VPS_IP
+```
+
+**2. Create a non-root user**
+
+```bash
+adduser deploy
+usermod -aG sudo deploy
+su - deploy
+```
+
+**3. Install Docker**
+
+```bash
+# Install prerequisites
+sudo apt-get update
+sudo apt-get install -y ca-certificates curl gnupg
+
+# Add Docker's official GPG key
+sudo install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+sudo chmod a+r /etc/apt/keyrings/docker.gpg
+
+# Add Docker repository
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+# Install Docker Engine + Compose
+sudo apt-get update
+sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+# Allow deploy user to run docker without sudo
+sudo usermod -aG docker deploy
+
+# Log out and back in for group change to take effect
+exit
+ssh deploy@YOUR_VPS_IP
+```
+
+**4. Verify Docker works**
+
+```bash
+docker --version
+# Docker version 24.x.x
+
+docker compose version
+# Docker Compose version v2.x.x
+```
+
+---
+
+### Phase 2: Deploy the Application
+
+**5. Clone the repository**
+
+```bash
+cd /home/deploy
+git clone https://github.com/lord-vinayak/lecture-chatbot.git
+cd lecture-chatbot
+```
+
+**6. Create your production .env file**
+
+```bash
+cp backend/.env.example backend/.env
+nano backend/.env
+```
+
+Set these values:
+
+```env
+DATABASE_URL=postgresql://postgres:strongpassword123@postgres:5432/videochat
+OPENAI_API_KEY=sk-your-actual-key-here
+OPENAI_MODEL=gpt-4o-mini
+WHISPER_MODEL=base
+EMBEDDING_MODEL=all-MiniLM-L6-v2
+```
+
+> Use a strong postgres password - this is a production server.
+
+**7. Update docker-compose.yml for production**
+
+The default `docker-compose.yml` mounts source code for hot reload - fine for local dev, not for production. Create a production override:
+
+```bash
+nano docker-compose.prod.yml
+```
+
+```yaml
+version: '3.8'
+
+services:
+  postgres:
+    environment:
+      POSTGRES_PASSWORD: strongpassword123
+
+  backend:
+    environment:
+      DATABASE_URL: postgresql://postgres:strongpassword123@postgres:5432/videochat
+    volumes: []                          # don't mount source code in prod
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --workers 2
+
+  frontend:
+    environment:
+      REACT_APP_API_URL: http://YOUR_VPS_IP:8000
+    volumes: []
+    command: npm run build && npx serve -s build -l 3000
+```
+
+Replace `YOUR_VPS_IP` with your actual VPS IP address (or domain if you've set up DNS).
+
+**8. Build and start**
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+```
+
+`-d` runs in detached (background) mode. First build takes 5-10 minutes.
+
+**9. Check everything is running**
+
+```bash
+docker compose ps
+```
+
+Expected output:
+
+```
+NAME                    STATUS          PORTS
+videochat_postgres      Up (healthy)    0.0.0.0:5432->5432/tcp
+videochat_backend       Up              0.0.0.0:8000->8000/tcp
+videochat_frontend      Up              0.0.0.0:3000->3000/tcp
+```
+
+**10. Test the deployment**
+
+```bash
+curl http://localhost:8000/health
+# {"status":"ok"}
+```
+
+From your local machine:
+
+```bash
+curl http://YOUR_VPS_IP:8000/health
+# {"status":"ok"}
+```
+
+Open `http://YOUR_VPS_IP:3000` in your browser.
+
+---
+
+### Phase 3: Open Firewall Ports (Hostinger hPanel)
+
+By default, Hostinger blocks all ports except 22 (SSH). You need to open ports 3000 and 8000.
+
+1. Log in to [hPanel](https://hpanel.hostinger.com)
+2. Go to **VPS** → your server → **Firewall**
+3. Add these inbound rules:
+
+| Port | Protocol | Source | Description |
+|---|---|---|---|
+| 3000 | TCP | 0.0.0.0/0 | React frontend |
+| 8000 | TCP | 0.0.0.0/0 | FastAPI backend |
+
+4. Click **Save rules**
+
+Alternatively, configure UFW directly on the server:
+
+```bash
+sudo ufw allow 22/tcp      # SSH - already open, keep it
+sudo ufw allow 3000/tcp    # Frontend
+sudo ufw allow 8000/tcp    # Backend API
+sudo ufw enable
+sudo ufw status
+```
+
+---
+
+### Phase 4: Set Up a Domain (Optional but Recommended)
+
+If you have a domain (e.g. `courses.yourdomain.com`), point it to your VPS and set up Nginx as a reverse proxy so both frontend and backend run on standard port 80/443.
+
+**Install Nginx:**
+
+```bash
+sudo apt-get install -y nginx certbot python3-certbot-nginx
+```
+
+**Create Nginx config:**
+
+```bash
+sudo nano /etc/nginx/sites-available/videochat
+```
+
+```nginx
+server {
+    listen 80;
+    server_name courses.yourdomain.com;
+
+    # Frontend
+    location / {
+        proxy_pass http://localhost:3000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+
+    # Backend API
+    location /api/ {
+        rewrite ^/api/(.*) /$1 break;
+        proxy_pass http://localhost:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+
+        # Allow large video uploads (1GB max)
+        client_max_body_size 1024M;
+        proxy_read_timeout 300s;
+    }
+}
+```
+
+**Enable the site:**
+
+```bash
+sudo ln -s /etc/nginx/sites-available/videochat /etc/nginx/sites-enabled/
+sudo nginx -t          # verify config is valid
+sudo systemctl reload nginx
+```
+
+**Add HTTPS (free SSL via Let's Encrypt):**
+
+```bash
+sudo certbot --nginx -d courses.yourdomain.com
+```
+
+Follow the prompts. Certbot auto-renews certificates. After this, your app runs at `https://courses.yourdomain.com`.
+
+Update `REACT_APP_API_URL` in `docker-compose.prod.yml` to use the domain:
+
+```yaml
+REACT_APP_API_URL: https://courses.yourdomain.com/api
+```
+
+Rebuild the frontend:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build frontend
+```
+
+---
+
+### Phase 5: Keeping It Running
+
+**Auto-restart on server reboot:**
+
+```bash
+# Enable Docker to start on boot
+sudo systemctl enable docker
+
+# Create a systemd service for the app
+sudo nano /etc/systemd/system/videochat.service
+```
+
+```ini
+[Unit]
+Description=Video Chat Q&A Platform
+After=docker.service
+Requires=docker.service
+
+[Service]
+WorkingDirectory=/home/deploy/lecture-chatbot
+ExecStart=/usr/bin/docker compose -f docker-compose.yml -f docker-compose.prod.yml up
+ExecStop=/usr/bin/docker compose down
+Restart=always
+User=deploy
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+sudo systemctl enable videochat
+sudo systemctl start videochat
+```
+
+**View logs:**
+
+```bash
+# All services
+docker compose logs -f
+
+# Backend only
+docker compose logs -f backend
+
+# Last 100 lines
+docker compose logs --tail=100 backend
+```
+
+**Update the app after a code change:**
+
+```bash
+cd /home/deploy/lecture-chatbot
+git pull origin main
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+```
 
 ---
 
@@ -132,7 +509,7 @@ Three cleanly separated layers process every request:
                           ↓
 ┌─────────────────────────────────────────────────────────┐
 │  Layer 3: Chat & Inference                              │
-│  question → vector search → Ollama → answer             │
+│  question → vector search → OpenAI GPT → answer         │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -149,7 +526,7 @@ Transcript stored in videos.transcript_text
   ↓
 Transcript chunked into ~500-token windows (50-token overlap)
   ↓
-Each chunk embedded via sentence-transformers
+Each chunk embedded via sentence-transformers (runs locally)
   ↓
 Embeddings stored in transcript_chunks with pgvector
   ↓
@@ -158,45 +535,39 @@ transcription_status → "completed"
 Frontend polls /videos/{id} every 3 seconds and shows "Ready"
 ```
 
-**Latency:** 2-5 minutes per hour of video on a mid-range GPU.
+**Latency:** 2-5 minutes per hour of video on a GPU; 10-20 minutes on CPU (base model).
 
 ### Chat Query Flow
 
 ```
 Student types question
   ↓
-Question embedded using same sentence-transformers model
+Question embedded using same sentence-transformers model (local)
   ↓
 pgvector ivfflat index: SELECT TOP 3 chunks by cosine similarity
   ↓
-Top 3 chunks passed to Ollama with strict context-only prompt:
-  "Answer ONLY based on the transcript content provided.
-   If the answer is not in the transcript, say so."
+Top 3 chunks + question sent to OpenAI GPT-4o-mini:
+  system: "Answer ONLY from the transcript. Say so if not found."
+  user:   "Transcript: [...chunks...]\n\nQuestion: [...]"
   ↓
-Llama 2 generates answer
+GPT-4o-mini generates answer
   ↓
 Answer + source chunks stored in chats table
   ↓
-Response returned to frontend (source chunks expandable in UI)
+Response returned to frontend with expandable source chunks
 ```
 
-**Total latency:** 1-3 seconds (vector search ~500ms + LLM inference ~1-2.5s).
-
-### Hallucination Prevention
-
-The system prevents hallucination at two levels:
-1. **Retrieval** - only transcript chunks are passed as context, no external knowledge
-2. **Prompt** - the model is explicitly instructed to say "I couldn't find that in the video" if the answer isn't in the provided chunks
+**Total latency:** ~1 second (vector search ~100ms + OpenAI API ~700ms).
 
 ---
 
 ## API Reference
 
-All endpoints are documented interactively at `http://localhost:8000/docs`.
+Interactive docs at `http://localhost:8000/docs` (Swagger UI).
 
 ### `POST /videos/upload`
 
-Upload a video file and start async transcription.
+Upload a video and start async transcription.
 
 **Request** - multipart/form-data:
 
@@ -223,19 +594,17 @@ Upload a video file and start async transcription.
 
 Poll transcription status. Frontend calls this every 3 seconds until status is `completed` or `failed`.
 
-**Response** `200` - same shape as upload response. `transcription_status` transitions: `pending` → `completed` | `failed`.
+`transcription_status` values: `pending` → `completed` | `failed`
 
 ### `POST /chats/{video_id}/ask`
 
-Ask a question about a video. Requires `transcription_status = "completed"`.
+Ask a question. Requires `transcription_status = "completed"`.
 
-**Query param:** `user_id` (UUID string, optional - defaults to a new random UUID)
+**Query param:** `user_id` (UUID string, optional)
 
 **Request body:**
 ```json
-{
-  "question": "What is the difference between a list and a tuple?"
-}
+{ "question": "What is the difference between a list and a tuple?" }
 ```
 
 **Response** `200`:
@@ -246,21 +615,14 @@ Ask a question about a video. Requires `transcription_status = "completed"`.
   "user_id": "...",
   "question": "What is the difference between a list and a tuple?",
   "answer": "According to the video, lists are mutable while tuples are immutable...",
-  "source_chunks": [
-    "...the relevant transcript excerpt that was used...",
-    "...another excerpt..."
-  ],
+  "source_chunks": ["...transcript excerpt used...", "...another excerpt..."],
   "created_at": "2026-07-06T12:01:00"
 }
 ```
 
-**Error responses:**
-- `400` - Video not yet transcribed or no chunks found
-- `404` - Video not found
-
 ### `GET /health`
 
-Health check. Returns `{"status": "ok"}` when the backend is up.
+Returns `{"status": "ok"}` when the backend is up.
 
 ---
 
@@ -268,29 +630,37 @@ Health check. Returns `{"status": "ok"}` when the backend is up.
 
 ### Backend (`backend/.env`)
 
-| Variable | Default | Description |
-|---|---|---|
-| `DATABASE_URL` | `postgresql://postgres:postgres@localhost:5432/videochat` | PostgreSQL connection string |
-| `OLLAMA_API_URL` | `http://localhost:11434` | Ollama inference server URL |
-| `OLLAMA_MODEL` | `llama2` | Ollama model name (e.g. `llama2:13b`, `mistral`) |
-| `WHISPER_MODEL` | `base` | Faster-Whisper model size (`tiny`, `base`, `small`, `medium`, `large`) |
-| `EMBEDDING_MODEL` | `all-MiniLM-L6-v2` | Sentence-transformers model name |
+| Variable | Default | Required | Description |
+|---|---|---|---|
+| `DATABASE_URL` | `postgresql://postgres:postgres@localhost:5432/videochat` | Yes | PostgreSQL connection string |
+| `OPENAI_API_KEY` | - | Yes | Your OpenAI API key (`sk-...`) |
+| `OPENAI_MODEL` | `gpt-4o-mini` | No | OpenAI model. `gpt-4o-mini` is cheapest; `gpt-4o` is most accurate |
+| `WHISPER_MODEL` | `base` | No | Faster-Whisper model size (see table below) |
+| `EMBEDDING_MODEL` | `all-MiniLM-L6-v2` | No | Sentence-transformers model (runs locally) |
 
 ### Frontend
 
 | Variable | Default | Description |
 |---|---|---|
-| `REACT_APP_API_URL` | `http://localhost:8000` | Backend API base URL |
+| `REACT_APP_API_URL` | `http://localhost:8000` | Backend API base URL. Change to your VPS IP or domain in production. |
 
 ### Whisper Model Size Guide
 
-| Model | VRAM | Speed | Accuracy |
-|---|---|---|---|
-| `tiny` | ~1GB | Fastest | Lower |
-| `base` | ~1GB | Fast | Good (default) |
-| `small` | ~2GB | Moderate | Better |
-| `medium` | ~5GB | Slower | Very good |
-| `large` | ~10GB | Slowest | Best |
+| Model | Disk | RAM | Speed | Accuracy |
+|---|---|---|---|---|
+| `tiny` | 75MB | ~1GB | Fastest | Lower |
+| `base` | 145MB | ~1GB | Fast | Good **(default)** |
+| `small` | 466MB | ~2GB | Moderate | Better |
+| `medium` | 1.5GB | ~5GB | Slower | Very good |
+| `large` | 2.9GB | ~10GB | Slowest | Best |
+
+### OpenAI Model Cost Guide
+
+| Model | Cost per question (approx) | Quality |
+|---|---|---|
+| `gpt-4o-mini` | ~$0.001 | Good **(default)** |
+| `gpt-4o` | ~$0.01 | Best |
+| `gpt-3.5-turbo` | ~$0.0005 | Acceptable |
 
 ---
 
@@ -299,38 +669,35 @@ Health check. Returns `{"status": "ok"}` when the backend is up.
 ```
 lecture-chatbot/
 ├── backend/
-│   ├── main.py                  # FastAPI app, routes, background task handler
+│   ├── main.py                  # FastAPI app, routes, background transcription task
 │   ├── models.py                # SQLAlchemy ORM (Video, TranscriptChunk, Chat)
 │   ├── database.py              # Connection pool, get_db() session factory
 │   ├── transcription.py         # Faster-Whisper wrapper, lazy model loading
 │   ├── embeddings.py            # Chunking, sentence-transformers, cosine similarity
-│   ├── llm.py                   # Ollama HTTP wrapper, context-only prompt
+│   ├── llm.py                   # OpenAI API wrapper, context-only prompt
 │   ├── schemas.py               # Pydantic request/response models
 │   ├── requirements.txt         # Python dependencies
 │   ├── .env.example             # Environment variable template
 │   ├── Dockerfile               # Backend container (python:3.11-slim + ffmpeg)
 │   ├── migrations/
-│   │   └── 001_initial_schema.sql  # Schema + pgvector indexes (auto-applied by Docker)
+│   │   └── 001_initial_schema.sql  # Schema + pgvector indexes (auto-applied)
 │   ├── test_database.py         # ORM + connection smoke test
 │   ├── test_embeddings.py       # Chunking + embedding unit tests
-│   ├── test_llm.py              # Ollama connection + QA tests
+│   ├── test_llm.py              # OpenAI connection + QA tests
 │   └── test_integration.py      # End-to-end upload → transcribe → ask flow
 ├── frontend/
 │   ├── src/
 │   │   ├── App.tsx              # Root component, layout, health check, polling
-│   │   ├── App.css              # Two-column layout, responsive breakpoints
 │   │   ├── VideoPlayer.tsx      # Upload form, transcription status display
-│   │   ├── VideoPlayer.css      # Upload panel styles
 │   │   ├── ChatBox.tsx          # Q&A interface, message history, source chunks
-│   │   ├── ChatBox.css          # Chat panel styles
 │   │   ├── api.ts               # Typed Axios client (uploadVideo, askQuestion, etc.)
 │   │   ├── index.tsx            # React DOM entry point
-│   │   └── index.css            # Global CSS reset
-│   ├── public/
-│   │   └── index.html           # HTML shell
-│   ├── package.json             # React 18 + TypeScript + Axios
-│   └── Dockerfile               # Frontend container (node:18-alpine)
-├── docker-compose.yml           # All four services + named volumes
+│   │   └── index.css / App.css / VideoPlayer.css / ChatBox.css
+│   ├── public/index.html
+│   ├── package.json
+│   └── Dockerfile
+├── docker-compose.yml           # Local dev (with hot reload)
+├── docker-compose.prod.yml      # Production overrides (create manually on server)
 └── docs/
     └── DESIGN.md                # Full architecture design specification
 ```
@@ -340,7 +707,6 @@ lecture-chatbot/
 ## Database Schema
 
 ```sql
--- Videos: one row per uploaded video
 videos
 ├── id                   UUID PRIMARY KEY
 ├── title                TEXT NOT NULL
@@ -348,136 +714,53 @@ videos
 ├── transcript_text      TEXT             -- populated after transcription
 ├── transcription_status VARCHAR(50)      -- 'pending' | 'completed' | 'failed'
 ├── upload_date          TIMESTAMP
-├── file_path            TEXT NOT NULL    -- path on disk (or S3 key in production)
+├── file_path            TEXT NOT NULL
 └── created_at           TIMESTAMP
 
--- TranscriptChunks: ~500-token windows with vector embeddings
 transcript_chunks
 ├── id           UUID PRIMARY KEY
 ├── video_id     UUID → videos(id) CASCADE DELETE
 ├── chunk_text   TEXT NOT NULL
 ├── embedding    vector(384)              -- pgvector column
-├── chunk_index  INT NOT NULL             -- position in original transcript
+├── chunk_index  INT NOT NULL
 └── created_at   TIMESTAMP
 
--- Chats: every Q&A pair ever asked about a video
 chats
 ├── id            UUID PRIMARY KEY
 ├── video_id      UUID → videos(id) CASCADE DELETE
 ├── user_id       UUID NOT NULL
 ├── question      TEXT NOT NULL
 ├── answer        TEXT
-├── source_chunks JSONB                   -- which chunks were used to generate answer
+├── source_chunks JSONB
 └── created_at    TIMESTAMP
 
 -- Indexes
-idx_transcript_chunks_embedding  USING ivfflat (embedding vector_cosine_ops)  -- fast ANN search
-idx_transcript_chunks_video_id   ON transcript_chunks(video_id)
-idx_chats_video_id               ON chats(video_id)
-idx_chats_user_id                ON chats(user_id)
-idx_videos_status                ON videos(transcription_status)
+idx_transcript_chunks_embedding  USING ivfflat (embedding vector_cosine_ops)
+idx_transcript_chunks_video_id
+idx_chats_video_id
+idx_chats_user_id
+idx_videos_status
 ```
 
 ---
 
 ## Running Tests
 
-Tests require running services (Postgres + Ollama). Start Docker Compose first, then:
+```bash
+# Exec into the running backend container
+docker exec -it videochat_backend bash
+
+# Then run any test file
+python test_embeddings.py   # no external services needed
+python test_llm.py          # needs OPENAI_API_KEY set
+python test_database.py     # needs postgres running
+python test_integration.py  # full end-to-end (place test_video.mp4 first)
+```
+
+Or locally from `backend/` with the venv activated:
 
 ```bash
-# Install dependencies locally (or exec into the container)
-cd backend
-pip install -r requirements.txt
-
-# Database connection + ORM smoke test
-python test_database.py
-
-# Embedding pipeline unit tests (no GPU needed)
 python test_embeddings.py
-
-# Ollama connection + QA tests (requires ollama running with a model pulled)
-python test_llm.py
-
-# Full end-to-end integration test
-# Place a test video at backend/test_video.mp4 first
-python test_integration.py
-```
-
-Or exec into the running container:
-
-```bash
-docker exec -it videochat_backend python test_embeddings.py
-```
-
-Expected output for `test_embeddings.py`:
-```
-✓ Chunking works: 12 chunks created
-✓ Embedding works: 384-dimensional vector
-✓ Batch embedding works
-✓ Similarity search works: found 2 similar chunks
-  Top result: Python is a programming language...
-
-✅ All embedding tests passed
-```
-
----
-
-## Deployment
-
-### Docker Compose (Demo / Single Server)
-
-The included `docker-compose.yml` is production-ready for a single server:
-
-```bash
-# On the server
-git clone https://github.com/lord-vinayak/lecture-chatbot.git
-cd lecture-chatbot
-cp backend/.env.example backend/.env
-# Edit backend/.env with production values
-docker-compose up -d
-
-# Pull the model (first time only)
-docker exec videochat_ollama ollama pull llama2
-```
-
-Recommended server spec: Hetzner or Hostinger instance with NVIDIA RTX 3090 or better.
-
-### Hetzner GPU Instance (Recommended)
-
-1. Create a GPU instance (e.g. GX2 with RTX 3090)
-2. Install Docker: `curl -fsSL https://get.docker.com | sh`
-3. Enable NVIDIA runtime: `apt-get install -y nvidia-container-toolkit`
-4. Update `docker-compose.yml` to add GPU access to the `backend` and `ollama` services:
-
-```yaml
-services:
-  ollama:
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
-```
-
-5. Run `docker-compose up -d`
-
-### Environment for Production
-
-Update `backend/.env`:
-
-```
-DATABASE_URL=postgresql://postgres:strongpassword@postgres:5432/videochat
-OLLAMA_API_URL=http://ollama:11434
-OLLAMA_MODEL=llama2
-WHISPER_MODEL=medium
-EMBEDDING_MODEL=all-MiniLM-L6-v2
-```
-
-Update `docker-compose.yml` frontend environment:
-```yaml
-REACT_APP_API_URL: https://your-domain.com/api
 ```
 
 ---
@@ -486,87 +769,79 @@ REACT_APP_API_URL: https://your-domain.com/api
 
 ### Transcription stuck on "pending"
 
-The background task is still running. Check backend logs:
+Check backend logs for errors:
 
 ```bash
-docker logs videochat_backend -f
+docker compose logs -f backend
 ```
 
-If you see `CUDA error` or `out of memory`, the Whisper model is too large for your GPU. Switch to a smaller model:
+If on CPU and using `medium` or `large` model, transcription is slow (20+ minutes). Switch to `base` in `.env` and restart:
 
 ```bash
-# In backend/.env
-WHISPER_MODEL=tiny
-docker-compose restart backend
+docker compose restart backend
 ```
 
-### Ollama returns empty answers
+### OpenAI API errors
 
-The model isn't pulled yet. Pull it:
+**`AuthenticationError`** - API key is wrong or not set. Check `backend/.env`.
+
+**`RateLimitError`** - Too many requests. The default `gpt-4o-mini` tier has generous limits; this rarely happens.
+
+**`APIConnectionError`** - Server can't reach OpenAI (common on restricted VPS). Test connectivity:
 
 ```bash
-docker exec videochat_ollama ollama pull llama2
+docker exec videochat_backend curl https://api.openai.com/v1/models -H "Authorization: Bearer $OPENAI_API_KEY"
 ```
-
-Check which models are available:
-
-```bash
-docker exec videochat_ollama ollama list
-```
-
-### "No transcript chunks found" error
-
-Transcription completed but chunking/embedding failed silently. Check backend logs:
-
-```bash
-docker logs videochat_backend | grep "Transcription"
-```
-
-Then re-upload the video. The video record can be deleted from Postgres and re-uploaded.
 
 ### pgvector extension not found
 
-The schema migration expects the `vector` extension. Verify it's installed:
+Verify it's installed in the database:
 
 ```bash
-docker exec videochat_postgres psql -U postgres -d videochat -c "SELECT * FROM pg_extension WHERE extname = 'vector';"
+docker exec videochat_postgres psql -U postgres -d videochat -c "SELECT extname FROM pg_extension;"
 ```
 
-If missing, the pgvector Docker image should install it automatically. Ensure you're using `pgvector/pgvector:0.5.0-pg15` (not plain `postgres`).
-
-### Backend fails to start - "could not connect to server"
-
-Postgres isn't ready yet. The `depends_on: condition: service_healthy` in docker-compose should handle this, but on slow machines the healthcheck may time out. Restart:
+If `vector` is missing, the schema init script didn't run. Apply it manually:
 
 ```bash
-docker-compose restart backend
+docker exec -i videochat_postgres psql -U postgres -d videochat < backend/migrations/001_initial_schema.sql
 ```
 
-### Frontend shows "Backend unavailable"
+### Ports 3000 / 8000 not accessible on VPS
 
-The frontend's health check to `http://localhost:8000/health` failed. Verify:
+Check UFW rules:
+
+```bash
+sudo ufw status
+```
+
+Check Hostinger hPanel firewall - make sure inbound TCP rules exist for ports 3000 and 8000.
+
+### "Backend unavailable" in frontend
 
 ```bash
 curl http://localhost:8000/health
-# Expected: {"status":"ok"}
 ```
 
-If the backend container is running but not responding, check its logs:
+If this fails, the backend container crashed. Check logs:
 
 ```bash
-docker logs videochat_backend
+docker compose logs backend
 ```
 
----
+### Large video uploads fail (Nginx 413 error)
 
-## Demo Success Criteria
+Add to your Nginx server block:
 
-| Test | Expected Result |
-|---|---|
-| Upload a 10-minute video | Transcription completes in < 5 minutes |
-| Ask a question directly answered in the video | Correct answer citing transcript content |
-| Ask a question NOT covered in the video | "I couldn't find that information in the video" |
-| 3 concurrent students asking questions | All get responses within 3-5 seconds |
+```nginx
+client_max_body_size 1024M;
+```
+
+Then reload Nginx:
+
+```bash
+sudo systemctl reload nginx
+```
 
 ---
 
@@ -574,12 +849,12 @@ docker logs videochat_backend
 
 No code changes needed to scale. Only component swaps:
 
-| Aspect | Demo (current) | Production |
+| Aspect | Current | Production |
 |---|---|---|
 | Transcription | FastAPI BackgroundTask | Celery + Redis job queue |
-| Inference | Single Ollama instance | vLLM with load balancing |
-| Caching | None | Redis for embeddings + responses |
-| Concurrency | ~10 students | 50+ concurrent students |
+| Embeddings | Computed on backend | Cache in Redis |
+| LLM | OpenAI gpt-4o-mini | OpenAI gpt-4o or fine-tuned model |
+| Concurrency | ~50 students | Unlimited (OpenAI rate limits apply) |
 | Orchestration | Docker Compose | Kubernetes or Docker Swarm |
 | Storage | Local disk (`uploads/`) | S3 or compatible object storage |
 
@@ -589,8 +864,8 @@ No code changes needed to scale. Only component swaps:
 
 - No authentication - demo assumes a trusted environment
 - No video playback in the UI - upload + Q&A only
-- Ollama handles 2-4 concurrent requests on a mid-range GPU; response time degrades gracefully beyond that
-- Whisper may hallucinate on noisy audio - mitigated by the context-only prompt
+- Transcript chunks are sent to OpenAI per question - not suitable for highly confidential content
+- Whisper may produce lower quality transcripts on noisy audio
 
 ---
 

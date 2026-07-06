@@ -8,8 +8,8 @@ from dotenv import load_dotenv
 
 from database import get_db, get_db_context
 from models import Video, TranscriptChunk, Chat
-from schemas import VideoUploadRequest, VideoResponse, ChatRequest, ChatResponse
-from transcription import transcribe_video, transcribe_with_timestamps
+from schemas import VideoResponse, ChatRequest, ChatResponse
+from transcription import transcribe_video
 from embeddings import chunk_transcript, embed_texts
 from llm import answer_question
 

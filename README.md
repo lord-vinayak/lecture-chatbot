@@ -271,16 +271,14 @@ nano docker-compose.prod.yml
 ```
 
 ```yaml
-version: '3.8'
-
 services:
   postgres:
     environment:
       POSTGRES_PASSWORD: strongpassword123
 
   backend:
-    environment:
-      DATABASE_URL: postgresql://postgres:strongpassword123@postgres:5432/videochat
+    # DATABASE_URL comes from backend/.env via env_file in docker-compose.yml
+    # Make sure backend/.env on the server uses strongpassword123 to match above
     volumes: []                          # don't mount source code in prod
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --workers 2
 
@@ -288,10 +286,12 @@ services:
     environment:
       REACT_APP_API_URL: http://YOUR_VPS_IP:8000
     volumes: []
-    command: npm run build && npx serve -s build -l 3000
+    command: sh -c "npm run build && npx serve -s build -l 3000"
 ```
 
 Replace `YOUR_VPS_IP` with your actual VPS IP address (or domain if you've set up DNS).
+
+> **Important:** The postgres password in the prod override (`strongpassword123`) must match the password in your `backend/.env` `DATABASE_URL`. If you change one, change both.
 
 **8. Build and start**
 

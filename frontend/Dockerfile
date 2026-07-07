@@ -1,5 +1,9 @@
 FROM node:16-alpine
 
+# npm drops root to "nobody" for lifecycle scripts by default, which then can't
+# write into root-owned dirs it creates itself (e.g. node_modules/.cache) — keep it root
+ENV NPM_CONFIG_UNSAFE_PERM=true
+
 WORKDIR /app
 
 # Copy package files

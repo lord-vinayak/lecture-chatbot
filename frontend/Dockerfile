@@ -1,7 +1,5 @@
 FROM node:16-alpine
 
-# npm drops root to "nobody" for lifecycle scripts by default, which then can't
-# write into root-owned dirs it creates itself (e.g. node_modules/.cache) — keep it root
 ENV NPM_CONFIG_UNSAFE_PERM=true
 
 WORKDIR /app
@@ -9,8 +7,12 @@ WORKDIR /app
 # Copy package files
 COPY package.json ./
 
-# Install dependencies
-RUN npm install --legacy-peer-deps
+# Install dependencies, and pre-create the cache/build dirs with open perms so
+# the anonymous /app/node_modules volume gets these baked in on first copy-up
+# (an existing anonymous volume is never re-populated by a later image rebuild)
+RUN npm install --legacy-peer-deps && \
+    mkdir -p node_modules/.cache build && \
+    chmod -R 777 node_modules/.cache build
 
 # Copy app code
 COPY . .
@@ -18,5 +20,5 @@ COPY . .
 # Expose port
 EXPOSE 3000
 
-# Bind-mounted volumes overwrite build-time permissions, so fix them at container start instead
+# Self-heal at start too, in case a bind mount or stale volume shadows the above
 CMD ["sh", "-c", "mkdir -p node_modules/.cache build && chmod -R 777 node_modules/.cache build && npm start"]

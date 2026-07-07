@@ -6,9 +6,7 @@ WORKDIR /app
 COPY package.json ./
 
 # Install dependencies
-RUN npm install --legacy-peer-deps && \
-    mkdir -p /app/node_modules/.cache /app/build && \
-    chmod -R 777 /app/node_modules/.cache /app/build
+RUN npm install --legacy-peer-deps
 
 # Copy app code
 COPY . .
@@ -16,5 +14,5 @@ COPY . .
 # Expose port
 EXPOSE 3000
 
-# Start development server
-CMD ["npm", "start"]
+# Bind-mounted volumes overwrite build-time permissions, so fix them at container start instead
+CMD ["sh", "-c", "mkdir -p node_modules/.cache build && chmod -R 777 node_modules/.cache build && npm start"]

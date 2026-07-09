@@ -20,6 +20,10 @@ export const ChatBox: React.FC<ChatBoxProps> = ({ video }) => {
     scrollToBottom();
   }, [messages]);
 
+  useEffect(() => {
+    setMessages([]);
+  }, [video?.id]);
+
   const handleAskQuestion = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -73,20 +77,6 @@ export const ChatBox: React.FC<ChatBoxProps> = ({ video }) => {
                   <div className="message answer-msg">
                     <strong>Assistant:</strong> {msg.answer}
                   </div>
-                  {msg.source_chunks && msg.source_chunks.length > 0 && (
-                    <div className="source-chunks">
-                      <details>
-                        <summary>Source ({msg.source_chunks.length} chunks)</summary>
-                        <div className="chunks-content">
-                          {msg.source_chunks.map((chunk, idx) => (
-                            <p key={idx} className="chunk-text">
-                              {chunk.substring(0, 150)}...
-                            </p>
-                          ))}
-                        </div>
-                      </details>
-                    </div>
-                  )}
                 </div>
               ))
             )}

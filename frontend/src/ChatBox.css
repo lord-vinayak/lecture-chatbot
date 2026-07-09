@@ -67,34 +67,6 @@
   font-style: italic;
 }
 
-.source-chunks {
-  margin-left: 10px;
-  margin-right: 10px;
-  background: var(--color-warning-bg);
-  border: 1px solid #fde68a;
-  padding: 10px 12px;
-  border-radius: var(--radius);
-  font-size: 12px;
-}
-
-.source-chunks summary {
-  cursor: pointer;
-  color: var(--color-text-muted);
-  font-weight: 500;
-}
-
-.chunks-content {
-  margin-top: 10px;
-}
-
-.chunk-text {
-  margin: 8px 0;
-  color: var(--color-text);
-  border-left: 2px solid var(--color-accent);
-  padding-left: 8px;
-  line-height: 1.4;
-}
-
 .chat-form {
   display: flex;
   gap: 10px;

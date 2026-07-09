@@ -52,7 +52,10 @@ export const ChatBox: React.FC<ChatBoxProps> = ({ video }) => {
 
       {!video || video.transcription_status !== 'completed' ? (
         <div className="chat-placeholder">
-          <p>👈 Upload and transcribe a video to start asking questions</p>
+          <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+          </svg>
+          <p>Upload and transcribe a video to start asking questions</p>
         </div>
       ) : (
         <>
@@ -73,7 +76,7 @@ export const ChatBox: React.FC<ChatBoxProps> = ({ video }) => {
                   {msg.source_chunks && msg.source_chunks.length > 0 && (
                     <div className="source-chunks">
                       <details>
-                        <summary>📄 Source ({msg.source_chunks.length} chunks)</summary>
+                        <summary>Source ({msg.source_chunks.length} chunks)</summary>
                         <div className="chunks-content">
                           {msg.source_chunks.map((chunk, idx) => (
                             <p key={idx} className="chunk-text">
@@ -89,7 +92,8 @@ export const ChatBox: React.FC<ChatBoxProps> = ({ video }) => {
             )}
             {isLoading && (
               <div className="message loading-msg">
-                <p>⏳ Thinking...</p>
+                <span className="spinner" aria-hidden="true" />
+                Thinking&hellip;
               </div>
             )}
             <div ref={messagesEndRef} />

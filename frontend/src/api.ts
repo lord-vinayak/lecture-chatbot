@@ -14,6 +14,7 @@ export interface Video {
   title: string;
   instructor_id: string;
   transcription_status: 'pending' | 'completed' | 'failed';
+  transcription_progress: number;
   transcript_text?: string;
   upload_date: string;
   file_path: string;

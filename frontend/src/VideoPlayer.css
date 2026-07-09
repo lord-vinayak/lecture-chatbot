@@ -159,7 +159,9 @@
 }
 
 .progress-label {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   margin-top: 6px;
   font-size: 12px;
   color: var(--color-text-muted);

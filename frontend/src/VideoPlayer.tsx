@@ -72,9 +72,13 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             </span>
           </p>
           {currentVideo.transcription_status === 'pending' && (
-            <div className="info-message">
-              <span className="spinner" aria-hidden="true" />
-              Transcribing&hellip; this typically takes 2-5 minutes
+            <div className="progress-wrap" role="progressbar" aria-valuenow={currentVideo.transcription_progress} aria-valuemin={0} aria-valuemax={100}>
+              <div className="progress-track">
+                <div className="progress-fill" style={{ width: `${currentVideo.transcription_progress}%` }} />
+              </div>
+              <span className="progress-label">
+                <span className="spinner" aria-hidden="true" /> Transcribing&hellip; {currentVideo.transcription_progress}%
+              </span>
             </div>
           )}
           {currentVideo.transcription_status === 'failed' && (

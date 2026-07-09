@@ -14,7 +14,10 @@ def get_whisper_model():
     if "model" not in MODEL_CACHE:
         device = "cuda" if ctranslate2.get_cuda_device_count() > 0 else "cpu"
         compute_type = "float16" if device == "cuda" else "int8"
-        MODEL_CACHE["model"] = WhisperModel(WHISPER_MODEL, device=device, compute_type=compute_type)
+        cpu_threads = os.cpu_count() or 4
+        MODEL_CACHE["model"] = WhisperModel(
+            WHISPER_MODEL, device=device, compute_type=compute_type, cpu_threads=cpu_threads
+        )
     return MODEL_CACHE["model"]
 
 def transcribe_video(file_path: str, on_progress=None) -> str:
@@ -26,7 +29,7 @@ def transcribe_video(file_path: str, on_progress=None) -> str:
     """
     model = get_whisper_model()
 
-    segments, info = model.transcribe(file_path, beam_size=5)
+    segments, info = model.transcribe(file_path, beam_size=1, vad_filter=True)
 
     texts = []
     for segment in segments:
@@ -43,7 +46,7 @@ def transcribe_with_timestamps(file_path: str) -> list[dict]:
     """
     model = get_whisper_model()
 
-    segments, info = model.transcribe(file_path, beam_size=5)
+    segments, info = model.transcribe(file_path, beam_size=1, vad_filter=True)
 
     result = []
     for segment in segments:

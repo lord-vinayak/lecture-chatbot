@@ -1,4 +1,4 @@
-from fastapi import FastAPI, File, UploadFile, Depends, HTTPException, BackgroundTasks
+from fastapi import FastAPI, File, Form, UploadFile, Depends, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 import uuid
@@ -75,8 +75,8 @@ def transcribe_and_store(video_id: uuid.UUID, file_path: str):
 @app.post("/videos/upload", response_model=VideoResponse)
 async def upload_video(
     file: UploadFile = File(...),
-    title: str = None,
-    instructor_id: str = None,
+    title: str = Form(...),
+    instructor_id: str = Form(...),
     background_tasks: BackgroundTasks = None,
     db: Session = Depends(get_db)
 ):

@@ -15,6 +15,7 @@ class Video(Base):
     instructor_id = Column(UUID(as_uuid=True), nullable=False)
     transcript_text = Column(Text)
     transcription_status = Column(String(50), default='pending')
+    transcription_progress = Column(Integer, nullable=False, default=0)
     upload_date = Column(TIMESTAMP, default=datetime.utcnow)
     file_path = Column(String, nullable=False)
     created_at = Column(TIMESTAMP, default=datetime.utcnow)

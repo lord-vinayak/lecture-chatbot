@@ -1,0 +1,1 @@
+ALTER TABLE videos ADD COLUMN IF NOT EXISTS transcription_progress INTEGER NOT NULL DEFAULT 0;

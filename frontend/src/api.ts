@@ -32,7 +32,8 @@ export interface ChatResponse {
 export const uploadVideo = async (
   file: File,
   title: string,
-  instructorId: string
+  instructorId: string,
+  onProgress?: (percent: number) => void
 ): Promise<Video> => {
   const formData = new FormData();
   formData.append('file', file);
@@ -40,7 +41,12 @@ export const uploadVideo = async (
   formData.append('instructor_id', instructorId);
 
   const response = await api.post<Video>('/videos/upload', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
+    headers: { 'Content-Type': undefined },
+    onUploadProgress: (event) => {
+      if (onProgress && event.total) {
+        onProgress(Math.round((event.loaded / event.total) * 100));
+      }
+    },
   });
 
   return response.data;

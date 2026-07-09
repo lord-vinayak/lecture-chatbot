@@ -43,6 +43,14 @@ const App: React.FC = () => {
     }, 3000);
   };
 
+  const handleBack = () => {
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
+    setCurrentVideo(null);
+  };
+
   return (
     <div className="app">
       <header className="app-header">
@@ -72,6 +80,7 @@ const App: React.FC = () => {
         <VideoPlayer
           currentVideo={currentVideo}
           onVideoLoaded={handleVideoLoaded}
+          onBack={handleBack}
         />
         <ChatBox video={currentVideo} />
       </div>

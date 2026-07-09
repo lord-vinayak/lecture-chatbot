@@ -58,6 +58,13 @@ export const getVideo = async (videoId: string): Promise<Video> => {
   return response.data;
 };
 
+export const listVideos = async (): Promise<Video[]> => {
+  const response = await api.get<Video[]>('/videos');
+  return response.data;
+};
+
+export const getVideoUrl = (video: Video): string => `${API_BASE_URL}/${video.file_path}`;
+
 export const askQuestion = async (
   videoId: string,
   question: string,

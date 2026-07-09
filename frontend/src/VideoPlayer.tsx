@@ -7,13 +7,20 @@ interface VideoPlayerProps {
   currentVideo: Video | null;
 }
 
+// crypto.randomUUID() requires a secure context (HTTPS/localhost); this works everywhere
+const generateUUID = (): string =>
+  'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+
 export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   onVideoLoaded,
   currentVideo,
 }) => {
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState('');
-  const [instructorId, setInstructorId] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [errorMessage, setErrorMessage] = useState('');
@@ -26,7 +33,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!file || !title || !instructorId) {
+    if (!file || !title) {
       setErrorMessage('Please fill in all fields before uploading.');
       return;
     }
@@ -36,11 +43,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     setUploadProgress(0);
 
     try {
-      const video = await uploadVideo(file, title, instructorId, setUploadProgress);
+      const video = await uploadVideo(file, title, generateUUID(), setUploadProgress);
       onVideoLoaded(video);
       setFile(null);
       setTitle('');
-      setInstructorId('');
     } catch (error) {
       setErrorMessage(`Upload failed: ${error}`);
     } finally {
@@ -87,18 +93,6 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="e.g., Intro to Python Lesson 1"
-              disabled={isUploading}
-            />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="instructor-id">Instructor ID (UUID)</label>
-            <input
-              id="instructor-id"
-              type="text"
-              value={instructorId}
-              onChange={(e) => setInstructorId(e.target.value)}
-              placeholder="550e8400-e29b-41d4-a716-446655440000"
               disabled={isUploading}
             />
           </div>

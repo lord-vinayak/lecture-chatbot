@@ -37,12 +37,17 @@ def transcribe_and_store(video_id: uuid.UUID, file_path: str):
         with get_db_context() as db:
             video = db.query(Video).filter(Video.id == video_id).first()
 
+            def update_progress(percent: int):
+                video.transcription_progress = percent
+                db.commit()
+
             # Transcribe
-            transcript = transcribe_video(file_path)
+            transcript = transcribe_video(file_path, on_progress=update_progress)
 
             # Store transcript
             video.transcript_text = transcript
             video.transcription_status = "completed"
+            video.transcription_progress = 100
             db.commit()
 
             # Chunk and embed

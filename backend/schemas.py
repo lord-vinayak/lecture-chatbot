@@ -13,6 +13,7 @@ class VideoResponse(BaseModel):
     title: str
     instructor_id: UUID
     transcription_status: str
+    transcription_progress: int = 0
     transcript_text: Optional[str] = None
     upload_date: datetime
     file_path: str

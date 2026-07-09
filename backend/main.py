@@ -1,6 +1,8 @@
 from fastapi import FastAPI, File, Form, UploadFile, Depends, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
+from typing import List
 import uuid
 import os
 from pathlib import Path
@@ -29,6 +31,9 @@ app.add_middleware(
 # Create uploads directory
 UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
+
+# Serve uploaded video files directly (supports Range requests for seeking)
+app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
 
 # --- Background transcription task ---
 def transcribe_and_store(video_id: uuid.UUID, file_path: str):
@@ -76,6 +81,11 @@ def transcribe_and_store(video_id: uuid.UUID, file_path: str):
         print(f"✗ Transcription failed for video {video_id}: {str(e)}")
 
 # --- Endpoints ---
+
+@app.get("/videos", response_model=List[VideoResponse])
+async def list_videos(db: Session = Depends(get_db)):
+    """List all uploaded videos, most recent first"""
+    return db.query(Video).order_by(Video.upload_date.desc()).all()
 
 @app.post("/videos/upload", response_model=VideoResponse)
 async def upload_video(

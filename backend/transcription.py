@@ -17,19 +17,24 @@ def get_whisper_model():
         MODEL_CACHE["model"] = WhisperModel(WHISPER_MODEL, device=device, compute_type=compute_type)
     return MODEL_CACHE["model"]
 
-def transcribe_video(file_path: str) -> str:
+def transcribe_video(file_path: str, on_progress=None) -> str:
     """
     Transcribe video file using Faster-Whisper.
-    Returns full transcript text.
+    Returns full transcript text. If on_progress is given, it's called with
+    an int 0-99 as segments complete (segments stream lazily from Whisper,
+    so this reflects real progress through the audio's duration).
     """
     model = get_whisper_model()
 
     segments, info = model.transcribe(file_path, beam_size=5)
 
-    # Combine all segments into single transcript
-    transcript = " ".join([segment.text for segment in segments])
+    texts = []
+    for segment in segments:
+        texts.append(segment.text)
+        if on_progress and info.duration:
+            on_progress(min(99, int(segment.end / info.duration * 100)))
 
-    return transcript
+    return " ".join(texts)
 
 def transcribe_with_timestamps(file_path: str) -> list[dict]:
     """

@@ -46,12 +46,24 @@ const App: React.FC = () => {
   return (
     <div className="app">
       <header className="app-header">
-        <h1>📹 Video Course Q&A</h1>
+        <h1>
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M15 10l4.55-2.28A1 1 0 0 1 21 8.62v6.76a1 1 0 0 1-1.45.9L15 14" />
+            <rect x="3" y="6" width="12" height="12" rx="2" />
+          </svg>
+          Video Course Q&amp;A
+        </h1>
         <div className="connection-status">
           {isConnected ? (
-            <span className="status-ok">✓ Connected</span>
+            <span className="status-ok">
+              <span className="status-dot" />
+              Connected
+            </span>
           ) : (
-            <span className="status-error">✗ Backend unavailable</span>
+            <span className="status-error">
+              <span className="status-dot" />
+              Backend unavailable
+            </span>
           )}
         </div>
       </header>

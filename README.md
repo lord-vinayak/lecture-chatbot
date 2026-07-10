@@ -7,7 +7,8 @@ A self-hosted platform where students ask questions about course videos and get 
 - **Upload & transcribe** course videos automatically via Faster-Whisper
 - **Ask questions** and get answers sourced only from what was taught in the video
 - **Hallucination prevention** - model explicitly refuses if the answer isn't in the transcript
-- **Chat history** with source chunk transparency (see exactly which part of the transcript was used)
+- **Video playback** - watch the source video alongside the transcript-grounded chat
+- **Chat history** for each video, backed by transcript source chunks stored server-side
 - **OpenAI-powered** answers via GPT-4o-mini (fast, cheap, accurate)
 - **Docker-first** - single `docker-compose up` to run everything locally
 
@@ -97,11 +98,15 @@ This starts three containers:
 
 | Container | What it is | Port |
 |---|---|---|
-| `videochat_postgres` | PostgreSQL 15 + pgvector | 5432 |
+| `videochat_postgres` | PostgreSQL 15 + pgvector | 5433 (host) → 5432 (container) |
 | `videochat_backend` | FastAPI backend | 8000 |
 | `videochat_frontend` | React frontend | 3000 |
 
-The database schema (tables + pgvector indexes) is applied automatically on first start.
+The initial schema (tables + pgvector indexes, `001_initial_schema.sql`) is applied automatically on first start via Postgres's `docker-entrypoint-initdb.d`. Later migrations (e.g. `002_add_transcription_progress.sql`) are not auto-applied by `docker-compose.yml` and must be run manually once, after the containers are up:
+
+```bash
+docker exec -i videochat_postgres psql -U postgres -d videochat < backend/migrations/002_add_transcription_progress.sql
+```
 
 First build takes 3-5 minutes while Docker downloads images and installs Python packages. Subsequent starts are instant.
 
@@ -155,10 +160,11 @@ CREATE DATABASE videochat;
 CREATE EXTENSION IF NOT EXISTS vector;
 ```
 
-Then apply the schema:
+Then apply the schema (both migrations, in order):
 
 ```bash
 psql -U postgres -d videochat -f backend/migrations/001_initial_schema.sql
+psql -U postgres -d videochat -f backend/migrations/002_add_transcription_progress.sql
 ```
 
 ---
@@ -301,6 +307,12 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 
 `-d` runs in detached (background) mode. First build takes 5-10 minutes.
 
+`docker-compose.yml` only auto-applies `001_initial_schema.sql` on first start. Apply the remaining migration once the containers are up:
+
+```bash
+docker exec -i videochat_postgres psql -U postgres -d videochat < backend/migrations/002_add_transcription_progress.sql
+```
+
 **9. Check everything is running**
 
 ```bash
@@ -311,9 +323,9 @@ Expected output:
 
 ```
 NAME                    STATUS          PORTS
-videochat_postgres      Up (healthy)    0.0.0.0:5432->5432/tcp
-videochat_backend       Up              0.0.0.0:8000->8000/tcp
-videochat_frontend      Up              0.0.0.0:3000->3000/tcp
+videochat_postgres      Up (healthy)    127.0.0.1:5433->5432/tcp
+videochat_backend       Up              127.0.0.1:8000->8000/tcp
+videochat_frontend      Up              127.0.0.1:3000->3000/tcp
 ```
 
 **10. Test the deployment**
@@ -565,6 +577,12 @@ Response returned to frontend with expandable source chunks
 
 Interactive docs at `http://localhost:8000/docs` (Swagger UI).
 
+### `GET /videos`
+
+List all uploaded videos, most recent first. Used to render the "Previous Videos" list on the upload screen.
+
+**Response** `200`: array of `VideoResponse` objects (same shape as `POST /videos/upload`).
+
 ### `POST /videos/upload`
 
 Upload a video and start async transcription.
@@ -584,6 +602,7 @@ Upload a video and start async transcription.
   "title": "Intro to Python - Lesson 1",
   "instructor_id": "...",
   "transcription_status": "pending",
+  "transcription_progress": 0,
   "transcript_text": null,
   "upload_date": "2026-07-06T12:00:00",
   "file_path": "uploads/550e8400....mp4"
@@ -595,6 +614,11 @@ Upload a video and start async transcription.
 Poll transcription status. Frontend calls this every 3 seconds until status is `completed` or `failed`.
 
 `transcription_status` values: `pending` → `completed` | `failed`
+`transcription_progress` is an integer 0-100, updated during transcription and shown as a progress bar in the UI.
+
+### `GET /uploads/{filename}`
+
+Static file mount serving the raw video files from the `uploads/` directory (supports Range requests, so the `<video>` player can seek). The frontend builds this URL from a video's `file_path`.
 
 ### `POST /chats/{video_id}/ask`
 
@@ -680,7 +704,8 @@ lecture-chatbot/
 │   ├── .env.example             # Environment variable template
 │   ├── Dockerfile               # Backend container (python:3.11-slim + ffmpeg)
 │   ├── migrations/
-│   │   └── 001_initial_schema.sql  # Schema + pgvector indexes (auto-applied)
+│   │   ├── 001_initial_schema.sql  # Schema + pgvector indexes (auto-applied)
+│   │   └── 002_add_transcription_progress.sql  # Adds videos.transcription_progress
 │   ├── test_database.py         # ORM + connection smoke test
 │   ├── test_embeddings.py       # Chunking + embedding unit tests
 │   ├── test_llm.py              # OpenAI connection + QA tests
@@ -713,6 +738,7 @@ videos
 ├── instructor_id        UUID NOT NULL
 ├── transcript_text      TEXT             -- populated after transcription
 ├── transcription_status VARCHAR(50)      -- 'pending' | 'completed' | 'failed'
+├── transcription_progress INT NOT NULL DEFAULT 0  -- 0-100
 ├── upload_date          TIMESTAMP
 ├── file_path            TEXT NOT NULL
 └── created_at           TIMESTAMP
@@ -863,7 +889,7 @@ No code changes needed to scale. Only component swaps:
 ## Known Limitations
 
 - No authentication - demo assumes a trusted environment
-- No video playback in the UI - upload + Q&A only
+- Chat UI doesn't surface which transcript chunks were used for an answer (the API still returns them in `source_chunks`)
 - Transcript chunks are sent to OpenAI per question - not suitable for highly confidential content
 - Whisper may produce lower quality transcripts on noisy audio
 

@@ -30,6 +30,8 @@ def download_audio(youtube_url: str) -> str:
         "noplaylist": True,
         "quiet": True,
         "no_warnings": True,
+        # web client gets bot-checked on datacenter IPs (Hetzner etc.); android/ios skip that
+        "extractor_args": {"youtube": {"player_client": ["android", "ios"]}},
     }
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:

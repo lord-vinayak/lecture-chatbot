@@ -1,9 +1,11 @@
+import os
 import re
 import tempfile
 from pathlib import Path
 import yt_dlp
 
 MAX_DURATION_SECONDS = 3 * 60 * 60
+COOKIES_FILE = os.getenv("COOKIES_FILE")
 
 YOUTUBE_URL_RE = re.compile(
     r"(?:youtube\.com/(?:watch\?v=|embed/)|youtu\.be/)([\w-]{11})"
@@ -30,9 +32,11 @@ def download_audio(youtube_url: str) -> str:
         "noplaylist": True,
         "quiet": True,
         "no_warnings": True,
-        # web client gets bot-checked on datacenter IPs (Hetzner etc.); android/ios skip that
-        "extractor_args": {"youtube": {"player_client": ["android", "ios"]}},
     }
+    # datacenter IPs (Hetzner etc.) get bot-checked by YouTube; authenticated
+    # cookies are the only reliable bypass as of yt-dlp 2026.7
+    if COOKIES_FILE and os.path.exists(COOKIES_FILE):
+        ydl_opts["cookiefile"] = COOKIES_FILE
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(youtube_url, download=False)

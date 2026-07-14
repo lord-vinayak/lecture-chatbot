@@ -22,6 +22,9 @@ backend/env/
 # Uploaded videos (can be large)
 uploads/
 
+# YouTube auth cookies (live credential, never commit)
+backend/cookies.txt
+
 # Pytest / coverage
 backend/.pytest_cache/
 backend/.coverage

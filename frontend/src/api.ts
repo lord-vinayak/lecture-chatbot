@@ -17,8 +17,17 @@ export interface Video {
   transcription_progress: number;
   transcript_text?: string;
   upload_date: string;
-  file_path: string;
+  file_path?: string;
+  source_type: 'upload' | 'youtube';
+  youtube_url?: string;
 }
+
+const YOUTUBE_URL_RE = /(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([\w-]{11})/;
+
+export const extractYoutubeId = (url: string): string | null => {
+  const match = url.match(YOUTUBE_URL_RE);
+  return match ? match[1] : null;
+};
 
 export interface ChatResponse {
   id: string;
@@ -53,6 +62,20 @@ export const uploadVideo = async (
   return response.data;
 };
 
+export const submitYoutubeVideo = async (
+  youtubeUrl: string,
+  title: string,
+  instructorId: string
+): Promise<Video> => {
+  const response = await api.post<Video>('/videos/youtube', {
+    youtube_url: youtubeUrl,
+    title,
+    instructor_id: instructorId,
+  });
+
+  return response.data;
+};
+
 export const getVideo = async (videoId: string): Promise<Video> => {
   const response = await api.get<Video>(`/videos/${videoId}`);
   return response.data;
@@ -64,6 +87,11 @@ export const listVideos = async (): Promise<Video[]> => {
 };
 
 export const getVideoUrl = (video: Video): string => `${API_BASE_URL}/${video.file_path}`;
+
+export const getYoutubeEmbedUrl = (video: Video): string => {
+  const id = video.youtube_url ? extractYoutubeId(video.youtube_url) : null;
+  return id ? `https://www.youtube.com/embed/${id}` : '';
+};
 
 export const askQuestion = async (
   videoId: string,

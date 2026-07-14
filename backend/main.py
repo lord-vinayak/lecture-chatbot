@@ -5,15 +5,17 @@ from sqlalchemy.orm import Session
 from typing import List
 import uuid
 import os
+import shutil
 from pathlib import Path
 from dotenv import load_dotenv
 
 from database import get_db, get_db_context
 from models import Video, TranscriptChunk, Chat
-from schemas import VideoResponse, ChatRequest, ChatResponse
+from schemas import VideoResponse, ChatRequest, ChatResponse, YoutubeVideoRequest
 from transcription import transcribe_video
 from embeddings import chunk_transcript, embed_texts
 from llm import answer_question
+from youtube import extract_youtube_id, download_audio
 
 load_dotenv()
 
@@ -36,8 +38,10 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
 
 # --- Background transcription task ---
-def transcribe_and_store(video_id: uuid.UUID, file_path: str):
-    """Background task: transcribe video and store transcript + chunks"""
+def transcribe_and_store(video_id: uuid.UUID, file_path: str = None, youtube_url: str = None):
+    """Background task: transcribe video and store transcript + chunks.
+    Pass file_path for uploads, or youtube_url to pull audio via yt-dlp first."""
+    audio_path = None
     try:
         with get_db_context() as db:
             video = db.query(Video).filter(Video.id == video_id).first()
@@ -46,8 +50,14 @@ def transcribe_and_store(video_id: uuid.UUID, file_path: str):
                 video.transcription_progress = percent
                 db.commit()
 
+            if youtube_url:
+                audio_path = download_audio(youtube_url)
+                source_path = audio_path
+            else:
+                source_path = file_path
+
             # Transcribe
-            transcript = transcribe_video(file_path, on_progress=update_progress)
+            transcript = transcribe_video(source_path, on_progress=update_progress)
 
             # Store transcript
             video.transcript_text = transcript
@@ -79,6 +89,9 @@ def transcribe_and_store(video_id: uuid.UUID, file_path: str):
                 video.transcription_status = "failed"
                 db.commit()
         print(f"✗ Transcription failed for video {video_id}: {str(e)}")
+    finally:
+        if audio_path:
+            shutil.rmtree(Path(audio_path).parent, ignore_errors=True)
 
 # --- Endpoints ---
 
@@ -127,7 +140,35 @@ async def upload_video(
     db.refresh(video)
 
     # Start transcription in background
-    background_tasks.add_task(transcribe_and_store, video_id, str(file_path))
+    background_tasks.add_task(transcribe_and_store, video_id, file_path=str(file_path))
+
+    return video
+
+@app.post("/videos/youtube", response_model=VideoResponse)
+async def submit_youtube_video(
+    request: YoutubeVideoRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+):
+    """Submit a YouTube link and start transcription in background"""
+
+    if not extract_youtube_id(request.youtube_url):
+        raise HTTPException(status_code=400, detail="Invalid YouTube URL")
+
+    video_id = uuid.uuid4()
+    video = Video(
+        id=video_id,
+        title=request.title,
+        instructor_id=request.instructor_id,
+        source_type="youtube",
+        youtube_url=request.youtube_url,
+        transcription_status="pending"
+    )
+    db.add(video)
+    db.commit()
+    db.refresh(video)
+
+    background_tasks.add_task(transcribe_and_store, video_id, youtube_url=request.youtube_url)
 
     return video
 

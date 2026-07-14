@@ -8,6 +8,11 @@ class VideoUploadRequest(BaseModel):
     title: str
     instructor_id: UUID
 
+class YoutubeVideoRequest(BaseModel):
+    title: str
+    instructor_id: UUID
+    youtube_url: str
+
 class VideoResponse(BaseModel):
     id: UUID
     title: str
@@ -16,7 +21,9 @@ class VideoResponse(BaseModel):
     transcription_progress: int = 0
     transcript_text: Optional[str] = None
     upload_date: datetime
-    file_path: str
+    file_path: Optional[str] = None
+    source_type: str
+    youtube_url: Optional[str] = None
 
     class Config:
         from_attributes = True

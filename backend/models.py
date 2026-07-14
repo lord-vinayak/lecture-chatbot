@@ -17,7 +17,9 @@ class Video(Base):
     transcription_status = Column(String(50), default='pending')
     transcription_progress = Column(Integer, nullable=False, default=0)
     upload_date = Column(TIMESTAMP, default=datetime.utcnow)
-    file_path = Column(String, nullable=False)
+    file_path = Column(String, nullable=True)
+    source_type = Column(String(20), nullable=False, default='upload')
+    youtube_url = Column(Text, nullable=True)
     created_at = Column(TIMESTAMP, default=datetime.utcnow)
 
 class TranscriptChunk(Base):

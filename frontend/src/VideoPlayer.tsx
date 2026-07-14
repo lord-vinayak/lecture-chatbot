@@ -1,5 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { Video, uploadVideo, listVideos, getVideoUrl } from './api';
+import {
+  Video,
+  uploadVideo,
+  submitYoutubeVideo,
+  listVideos,
+  getVideoUrl,
+  getYoutubeEmbedUrl,
+  extractYoutubeId,
+} from './api';
 import './VideoPlayer.css';
 
 interface VideoPlayerProps {
@@ -21,7 +29,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   onBack,
   currentVideo,
 }) => {
+  const [sourceMode, setSourceMode] = useState<'upload' | 'youtube'>('upload');
   const [file, setFile] = useState<File | null>(null);
+  const [youtubeUrl, setYoutubeUrl] = useState('');
   const [title, setTitle] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -46,6 +56,34 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (sourceMode === 'youtube') {
+      if (!youtubeUrl || !title) {
+        setErrorMessage('Please fill in all fields before submitting.');
+        return;
+      }
+      if (!extractYoutubeId(youtubeUrl)) {
+        setErrorMessage('Please enter a valid YouTube URL.');
+        return;
+      }
+
+      setErrorMessage('');
+      setIsUploading(true);
+
+      try {
+        const video = await submitYoutubeVideo(youtubeUrl, title, generateUUID());
+        onVideoLoaded(video);
+        refreshVideoList();
+        setYoutubeUrl('');
+        setTitle('');
+      } catch (error) {
+        setErrorMessage(`Submission failed: ${error}`);
+      } finally {
+        setIsUploading(false);
+      }
+      return;
+    }
+
     if (!file || !title) {
       setErrorMessage('Please fill in all fields before uploading.');
       return;
@@ -80,13 +118,24 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             </button>
           </div>
 
-          <video
-            key={currentVideo.id}
-            className="video-player"
-            src={getVideoUrl(currentVideo)}
-            controls
-            preload="metadata"
-          />
+          {currentVideo.source_type === 'youtube' ? (
+            <iframe
+              key={currentVideo.id}
+              className="video-player"
+              src={getYoutubeEmbedUrl(currentVideo)}
+              title={currentVideo.title}
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+            />
+          ) : (
+            <video
+              key={currentVideo.id}
+              className="video-player"
+              src={getVideoUrl(currentVideo)}
+              controls
+              preload="metadata"
+            />
+          )}
 
           <div className="video-info">
             <p>
@@ -136,6 +185,29 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           )}
 
           <form onSubmit={handleUpload} className="upload-form">
+            <div className="form-group source-toggle" role="tablist">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={sourceMode === 'upload'}
+                className={`toggle-button ${sourceMode === 'upload' ? 'active' : ''}`}
+                onClick={() => setSourceMode('upload')}
+                disabled={isUploading}
+              >
+                Upload File
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={sourceMode === 'youtube'}
+                className={`toggle-button ${sourceMode === 'youtube' ? 'active' : ''}`}
+                onClick={() => setSourceMode('youtube')}
+                disabled={isUploading}
+              >
+                YouTube Link
+              </button>
+            </div>
+
             <div className="form-group">
               <label htmlFor="video-title">Video Title</label>
               <input
@@ -148,27 +220,41 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               />
             </div>
 
-            <div className="form-group">
-              <label htmlFor="video-file">Select Video File</label>
-              <input
-                id="video-file"
-                type="file"
-                accept="video/*"
-                onChange={handleFileSelect}
-                disabled={isUploading}
-              />
-              {file && !isUploading && (
-                <p className="file-info">
-                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                    <path d="M14 2v6h6" />
-                  </svg>
-                  {file.name}
-                </p>
-              )}
-            </div>
+            {sourceMode === 'upload' ? (
+              <div className="form-group">
+                <label htmlFor="video-file">Select Video File</label>
+                <input
+                  id="video-file"
+                  type="file"
+                  accept="video/*"
+                  onChange={handleFileSelect}
+                  disabled={isUploading}
+                />
+                {file && !isUploading && (
+                  <p className="file-info">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                      <path d="M14 2v6h6" />
+                    </svg>
+                    {file.name}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div className="form-group">
+                <label htmlFor="video-youtube-url">YouTube URL</label>
+                <input
+                  id="video-youtube-url"
+                  type="url"
+                  value={youtubeUrl}
+                  onChange={(e) => setYoutubeUrl(e.target.value)}
+                  placeholder="https://www.youtube.com/watch?v=..."
+                  disabled={isUploading}
+                />
+              </div>
+            )}
 
-            {isUploading && (
+            {isUploading && sourceMode === 'upload' && (
               <div className="progress-wrap" role="progressbar" aria-valuenow={uploadProgress} aria-valuemin={0} aria-valuemax={100}>
                 <div className="progress-track">
                   <div className="progress-fill" style={{ width: `${uploadProgress}%` }} />
@@ -179,8 +265,14 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               </div>
             )}
 
+            {isUploading && sourceMode === 'youtube' && (
+              <p className="progress-label">Submitting…</p>
+            )}
+
             <button type="submit" disabled={isUploading} className="primary-button">
-              {isUploading ? 'Uploading…' : 'Upload & Transcribe'}
+              {isUploading
+                ? sourceMode === 'youtube' ? 'Submitting…' : 'Uploading…'
+                : sourceMode === 'youtube' ? 'Submit & Transcribe' : 'Upload & Transcribe'}
             </button>
 
             {errorMessage && <p className="error-message">{errorMessage}</p>}

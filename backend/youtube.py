@@ -1,5 +1,6 @@
 import os
 import re
+import shutil
 import tempfile
 from pathlib import Path
 import yt_dlp
@@ -34,9 +35,13 @@ def download_audio(youtube_url: str) -> str:
         "no_warnings": True,
     }
     # datacenter IPs (Hetzner etc.) get bot-checked by YouTube; authenticated
-    # cookies are the only reliable bypass as of yt-dlp 2026.7
+    # cookies are the only reliable bypass as of yt-dlp 2026.7.
+    # yt-dlp writes the cookie jar back on close, so copy to a writable path -
+    # the mounted source file stays read-only.
     if COOKIES_FILE and os.path.exists(COOKIES_FILE):
-        ydl_opts["cookiefile"] = COOKIES_FILE
+        writable_cookies = str(Path(tmp_dir) / "cookies.txt")
+        shutil.copy(COOKIES_FILE, writable_cookies)
+        ydl_opts["cookiefile"] = writable_cookies
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(youtube_url, download=False)

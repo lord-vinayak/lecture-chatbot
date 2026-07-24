@@ -33,6 +33,9 @@ def download_audio(youtube_url: str) -> str:
         "noplaylist": True,
         "quiet": True,
         "no_warnings": True,
+        # web client's formats need a PO token to resolve even with cookies;
+        # tv client isn't gated behind that, so it still returns usable formats
+        "extractor_args": {"youtube": {"player_client": ["tv"]}},
     }
     # datacenter IPs (Hetzner etc.) get bot-checked by YouTube; authenticated
     # cookies are the only reliable bypass as of yt-dlp 2026.7.

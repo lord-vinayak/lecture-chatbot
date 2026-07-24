@@ -186,6 +186,29 @@ async def get_video(video_id: str, db: Session = Depends(get_db)):
 
     return video
 
+@app.delete("/videos/{video_id}")
+async def delete_video(video_id: str, db: Session = Depends(get_db)):
+    """Delete a video and its transcript chunks/chats"""
+    try:
+        vid_uuid = uuid.UUID(video_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid video_id UUID")
+
+    video = db.query(Video).filter(Video.id == vid_uuid).first()
+    if not video:
+        raise HTTPException(status_code=404, detail="Video not found")
+
+    db.query(TranscriptChunk).filter(TranscriptChunk.video_id == vid_uuid).delete()
+    db.query(Chat).filter(Chat.video_id == vid_uuid).delete()
+
+    if video.file_path and os.path.exists(video.file_path):
+        os.remove(video.file_path)
+
+    db.delete(video)
+    db.commit()
+
+    return {"status": "deleted"}
+
 @app.post("/chats/{video_id}/ask", response_model=ChatResponse)
 async def ask_question(
     video_id: str,

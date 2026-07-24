@@ -73,5 +73,17 @@
     max-width: 100%;
     border-right: none;
     border-bottom: 1px solid var(--color-border);
+    overflow: visible;
+  }
+
+  .upload-section {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--color-surface);
+  }
+
+  .video-list-scroll {
+    overflow-y: visible;
   }
 }

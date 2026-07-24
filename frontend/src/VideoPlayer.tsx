@@ -4,6 +4,7 @@ import {
   uploadVideo,
   submitYoutubeVideo,
   listVideos,
+  deleteVideo,
   getVideoUrl,
   getYoutubeEmbedUrl,
   extractYoutubeId,
@@ -47,6 +48,19 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   useEffect(() => {
     refreshVideoList();
   }, []);
+
+  const handleDelete = async (e: React.MouseEvent, video: Video) => {
+    e.stopPropagation();
+    if (!window.confirm(`Delete "${video.title}"? This can't be undone.`)) return;
+
+    try {
+      await deleteVideo(video.id);
+      refreshVideoList();
+      if (currentVideo?.id === video.id) onBack();
+    } catch (error) {
+      setErrorMessage(`Delete failed: ${error}`);
+    }
+  };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files?.[0]) {
@@ -110,7 +124,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   return (
     <div className="video-player-container">
       {currentVideo ? (
-        <>
+        <div className="video-detail-scroll">
           <div className="video-player-header">
             <h2>{currentVideo.title}</h2>
             <button type="button" className="link-button" onClick={onBack}>
@@ -160,29 +174,11 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               </p>
             )}
           </div>
-        </>
+        </div>
       ) : (
         <>
+          <div className="upload-section">
           <h2>Upload Course Video</h2>
-
-          {videos.length > 0 && (
-            <div className="video-list">
-              <h3>Previous Videos</h3>
-              {videos.map((v) => (
-                <button
-                  key={v.id}
-                  type="button"
-                  className="video-list-item"
-                  onClick={() => onVideoLoaded(v)}
-                >
-                  <span className="video-list-title">{v.title}</span>
-                  <span className={`status-pill status-${v.transcription_status}`}>
-                    {v.transcription_status}
-                  </span>
-                </button>
-              ))}
-            </div>
-          )}
 
           <form onSubmit={handleUpload} className="upload-form">
             <div className="form-group source-toggle" role="tablist">
@@ -277,6 +273,41 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
             {errorMessage && <p className="error-message">{errorMessage}</p>}
           </form>
+          </div>
+
+          {videos.length > 0 && (
+            <div className="video-list-scroll">
+              <h3>Previous Videos</h3>
+              <div className="video-list">
+                {videos.map((v) => (
+                  <div key={v.id} className="video-list-item">
+                    <button
+                      type="button"
+                      className="video-list-item-main"
+                      onClick={() => onVideoLoaded(v)}
+                    >
+                      <span className="video-list-title">{v.title}</span>
+                      <span className={`status-pill status-${v.transcription_status}`}>
+                        {v.transcription_status}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={`Delete ${v.title}`}
+                      className="delete-button"
+                      onClick={(e) => handleDelete(e, v)}
+                    >
+                      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M3 6h18" />
+                        <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                      </svg>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>

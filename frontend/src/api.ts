@@ -86,6 +86,10 @@ export const listVideos = async (): Promise<Video[]> => {
   return response.data;
 };
 
+export const deleteVideo = async (videoId: string): Promise<void> => {
+  await api.delete(`/videos/${videoId}`);
+};
+
 export const getVideoUrl = (video: Video): string => `${API_BASE_URL}/${video.file_path}`;
 
 export const getYoutubeEmbedUrl = (video: Video): string => {
